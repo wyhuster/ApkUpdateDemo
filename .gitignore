@@ -24,3 +24,6 @@ proguard/
 
 # Eclipse configuration file
 .settings/
+
+# Mac OSX 
+.DS_Store
