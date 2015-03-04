@@ -25,6 +25,7 @@ import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
@@ -35,6 +36,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
+import android.view.View;
 import android.widget.Toast;
 
 public class UpdateActivity extends Activity {
@@ -43,7 +45,7 @@ public class UpdateActivity extends Activity {
 	private boolean isDestroy = true;
 
 	private String currentVersion;
-	private String check_url = "http://dd.gtja.com/download/yyz/YyzplusVer.json";
+	private String check_url = Constants.URL_CHECK_UPDATE;
 	private int update_type = -1;
 	private ProgressDialog dialog;
 
@@ -51,13 +53,21 @@ public class UpdateActivity extends Activity {
 	private boolean isBinded;
 	private SharedPreferences sp;
 
+	private View update_loading;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_update);
+		update_loading = findViewById(R.id.update_loading);
+
 		app = (MyApp) getApplication();
 		update_type = getIntent().getIntExtra("update_type", -1);
 		sp = PreferenceManager.getDefaultSharedPreferences(this);
+
+		if (!app.isDownload()) {
+			checkUpdate(check_url);
+		}
 	}
 
 	/**
@@ -67,7 +77,7 @@ public class UpdateActivity extends Activity {
 	 */
 	private void checkUpdate(String url) {
 
-		// 当前版本
+		// 获取当前安装的版本
 		currentVersion = null;
 		try {
 			PackageManager packageManager = getPackageManager();
@@ -75,22 +85,25 @@ public class UpdateActivity extends Activity {
 			PackageInfo packInfo = packageManager.getPackageInfo(
 					getPackageName(), 0);
 			currentVersion = packInfo.versionName;
-			// int versioncode = packInfo.versionCode;
 		} catch (NameNotFoundException e) {
 			e.printStackTrace();
 		}
 		if (currentVersion == null)
 			return;
 
-		// 创建RequestQueue对象
+		update_loading.setVisibility(View.VISIBLE);
+		// volley后台请求版本更新信息
 		RequestQueue mRequestQueue = Volley.newRequestQueue(this);
-		// 创建JsonObjectRequest对象
 		JsonObjectRequest mJsonObjectRequest = new JsonObjectRequest(url, null,
 				new Response.Listener<JSONObject>() {
 					@Override
 					public void onResponse(JSONObject response) {
+						update_loading.setVisibility(View.GONE);
 						System.out.println("app update请求结果:"
 								+ response.toString());
+						if (isDestroy) {
+							return;
+						}
 						try {
 							String android_update = response
 									.getString("android");
@@ -99,37 +112,21 @@ public class UpdateActivity extends Activity {
 							String newVersion = model.getVersion();
 							if (newVersion != null) {
 								if (newVersion.compareTo(currentVersion) > 0) {
-									boolean needDownload = false;
-									File local_file = new File(
-											Constants.APK_SAVE_FILE_NAME);
-									if (local_file.exists()) {
-										String local_apk_version = sp
-												.getString(
-														Constants.LOCAL_APK_VERSION,
-														"");
-										if (newVersion
-												.compareTo(local_apk_version) > 0) {
-											needDownload = true;
-										} else {
-											showInstallApkDialog(local_file);
-										}
-									} else {
-										needDownload = true;
-									}
-									if (needDownload) {
-										switch (update_type) {
-										case UpdateType.UPDATE_NORMAL:
-											updateNormal(model);
-											break;
-										case UpdateType.UPDATE_FORCE:
-											updateForce(model);
-											break;
-										case UpdateType.UPDATE_SILENCE:
+									// if (checkNeedDownload(newVersion)) {
+									switch (update_type) {
+									case UpdateType.UPDATE_NORMAL:
+										updateNormal(model);
+										break;
+									case UpdateType.UPDATE_FORCE:
+										updateForce(model);
+										break;
+									case UpdateType.UPDATE_SILENCE:
+										if (checkNeedDownload(newVersion)) {
 											updateSilence(model);
-											break;
 										}
+										break;
 									}
-
+									// }
 								}
 							}
 						} catch (JSONException e) {
@@ -139,23 +136,47 @@ public class UpdateActivity extends Activity {
 				}, new Response.ErrorListener() {
 					@Override
 					public void onErrorResponse(VolleyError error) {
-						System.out
-								.println("app update请求错误:" + error.toString());
+						update_loading.setVisibility(View.GONE);
+						System.out.println("app update请求错误:" + error.toString());
 						Toast.makeText(getApplicationContext(),
 								error.toString(), Toast.LENGTH_SHORT).show();
 					}
 				});
 
-		// 将JsonObjectRequest添加到RequestQueue
+		mJsonObjectRequest.setShouldCache(false);
 		mRequestQueue.add(mJsonObjectRequest);
+	}
 
+	/**
+	 * 判断本地是否已经下载了最新的apk
+	 * 
+	 * @param newVersion
+	 * @return
+	 */
+	private boolean checkNeedDownload(String newVersion) {
+		boolean needDownload = false;
+		// File local_file = new File(Constants.APK_SAVE_FILE_NAME);
+		File local_file = new File(app.getApk_save_name());
+		if (local_file.exists()) {
+			String local_apk_version = sp.getString(
+					Constants.LOCAL_APK_VERSION, "");
+			if (newVersion.compareTo(local_apk_version) > 0) {
+				needDownload = true;
+			} else {
+				showInstallApkDialog(local_file);
+				// needDownload = false;
+			}
+		} else {
+			needDownload = true;
+		}
+		return needDownload;
 	}
 
 	private void showInstallApkDialog(final File local_file) {
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
 		builder.setTitle("应用更新")
 				.setMessage("已准备好新版本，是否安装？")
-				.setCancelable(false)
+				.setCancelable(true)
 				.setPositiveButton("是", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
 						// 安装本地apk
@@ -188,7 +209,7 @@ public class UpdateActivity extends Activity {
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
 		builder.setTitle("检测到新版本,是否下载？")
 				.setMessage(model.getNoticeText())
-				.setCancelable(false)
+				.setCancelable(true)
 				.setPositiveButton("是", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
 						if (!app.isDownload()) {
@@ -221,14 +242,21 @@ public class UpdateActivity extends Activity {
 		// notify user to download
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
 		builder.setTitle("检测到新版本,请更新").setMessage(model.getNoticeText())
-				.setCancelable(false)
+				.setCancelable(true)
 				.setPositiveButton("更新", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
 						if (!app.isDownload()) {
 							startForceDownload(url, versionname);
 						}
 					}
+				}).setOnCancelListener(new OnCancelListener() {
+
+					@Override
+					public void onCancel(DialogInterface dialog) {
+						finish();
+					}
 				}).create().show();
+
 	}
 
 	/**
@@ -239,7 +267,14 @@ public class UpdateActivity extends Activity {
 	private void startForceDownload(String url, String versionname) {
 		dialog = new ProgressDialog(this);
 		dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);// 设置水平进度条
-		dialog.setCancelable(false);
+		// dialog.setCancelable(false);
+		dialog.setOnCancelListener(new OnCancelListener() {
+
+			@Override
+			public void onCancel(DialogInterface dialog) {
+				finish();
+			}
+		});
 		dialog.setCanceledOnTouchOutside(false);
 		dialog.setIcon(R.drawable.ic_launcher);// 设置提示的title的图标，默认是没有的
 		dialog.setTitle("更新");
@@ -296,16 +331,14 @@ public class UpdateActivity extends Activity {
 	@Override
 	protected void onResume() {
 		super.onResume();
-		if (isDestroy && !app.isDownload()) {
-			checkUpdate(check_url);
-		}
-		System.out.println(" notification  onresume");
+		isDestroy = false;
+		System.out.println(" notification  onResume");
 	}
 
 	@Override
 	protected void onNewIntent(Intent intent) {
 		super.onNewIntent(intent);
-		if (isDestroy && !app.isDownload()) {
+		if (!app.isDownload()) {
 			checkUpdate(check_url);
 		}
 		System.out.println(" notification  onNewIntent");
@@ -326,14 +359,25 @@ public class UpdateActivity extends Activity {
 	@Override
 	protected void onStop() {
 		super.onStop();
-		isDestroy = false;
+		isDestroy = true;
+		// 取消下载
+		cancelDownload();
 		System.out.println(" notification  onStop");
 	}
 
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
+		System.out.println(" notification  onDestroy");
+	}
+
+	/**
+	 * 取消下载，unbind和stop service
+	 */
+	private void cancelDownload() {
 		if (isBinded) {
+			binder.cancel();
+			binder.cancelNotification();
 			System.out.println(" onDestroy   unbindservice");
 			unbindService(conn);
 		}
@@ -362,4 +406,5 @@ public class UpdateActivity extends Activity {
 	public interface ICallbackResult {
 		public void OnBackResult(Object result);
 	}
+
 }

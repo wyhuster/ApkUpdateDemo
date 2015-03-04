@@ -46,10 +46,7 @@ public class DownloadService extends Service {
 	private int update_type = -1;
 	private String versionname;
 
-	// private static final String savePath = "/sdcard/updateApkDemo/";
 	private String savePath = Constants.APK_SAVE_PATH;
-	// private static final String saveFileName = savePath +
-	// "YYZ_AppUpdate.apk";
 	private String saveFileName = Constants.APK_SAVE_FILE_NAME;
 	private String tempSaveFileName = savePath + "temp";
 	private ICallbackResult callback;
@@ -91,6 +88,7 @@ public class DownloadService extends Service {
 					mNotification.contentView = null;
 					mNotification.setLatestEventInfo(mContext, "易阳指", "下载失败",
 							null);
+					mNotificationManager.notify(NOTIFY_ID, mNotification);
 				}
 				serviceIsDestroy = true;
 				stopSelf();
@@ -136,6 +134,10 @@ public class DownloadService extends Service {
 		mNotificationManager = (NotificationManager) getSystemService(android.content.Context.NOTIFICATION_SERVICE);
 		// setForeground(true);
 		app = (MyApp) getApplication();
+		savePath = app.getApk_save_path();
+		saveFileName = app.getApk_save_name();
+		tempSaveFileName = savePath + "temp";
+
 		sp = PreferenceManager.getDefaultSharedPreferences(this);
 	}
 
@@ -151,7 +153,8 @@ public class DownloadService extends Service {
 			update_type = intent.getIntExtra("update_type", -1);
 			apkUrl = intent.getStringExtra("download_url");
 			versionname = intent.getStringExtra("versionname");
-			apkUrl = "http://softfile.3g.qq.com:8080/msoft/179/24659/43549/qq_hd_mini_1.4.apk";
+			// apkUrl =
+			// "http://softfile.3g.qq.com:8080/msoft/179/24659/43549/qq_hd_mini_1.4.apk";
 		}
 		System.out.println("onBind");
 		return binder;
@@ -322,6 +325,7 @@ public class DownloadService extends Service {
 			}
 			// String apkFile = saveFileName;
 			String apkFile = tempSaveFileName;
+			System.out.println("download path:" + apkFile);
 			File ApkFile = new File(apkFile);
 			FileOutputStream fos = new FileOutputStream(ApkFile);
 
