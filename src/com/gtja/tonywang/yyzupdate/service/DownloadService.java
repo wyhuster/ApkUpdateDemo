@@ -1,12 +1,14 @@
 package com.gtja.tonywang.yyzupdate.service;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.channels.FileChannel;
 
 import com.gtja.tonywang.yyzupdate.Constants;
 import com.gtja.tonywang.yyzupdate.MyApp;
@@ -45,10 +47,11 @@ public class DownloadService extends Service {
 	private String versionname;
 
 	// private static final String savePath = "/sdcard/updateApkDemo/";
-	private static final String savePath = Constants.APK_SAVE_PATH;
+	private String savePath = Constants.APK_SAVE_PATH;
 	// private static final String saveFileName = savePath +
 	// "YYZ_AppUpdate.apk";
-	private static final String saveFileName = Constants.APK_SAVE_FILE_NAME;
+	private String saveFileName = Constants.APK_SAVE_FILE_NAME;
+	private String tempSaveFileName = savePath + "temp";
 	private ICallbackResult callback;
 	private DownloadBinder binder;
 	private MyApp app;
@@ -72,6 +75,7 @@ public class DownloadService extends Service {
 				Editor editor = sp.edit();
 				editor.putString(Constants.LOCAL_APK_VERSION, versionname);
 				editor.commit();
+				fileChannelCopy(tempSaveFileName, saveFileName);
 				serviceIsDestroy = true;
 				stopSelf();
 				if (update_type != UpdateType.UPDATE_SILENCE) {
@@ -88,7 +92,6 @@ public class DownloadService extends Service {
 					mNotification.setLatestEventInfo(mContext, "易阳指", "下载失败",
 							null);
 				}
-				deleteAPKFile();
 				serviceIsDestroy = true;
 				stopSelf();
 				break;
@@ -98,7 +101,6 @@ public class DownloadService extends Service {
 				if (update_type == UpdateType.UPDATE_NORMAL) {
 					mNotificationManager.cancel(NOTIFY_ID);
 				}
-				deleteAPKFile();
 				serviceIsDestroy = true;
 				stopSelf();
 				break;
@@ -216,17 +218,37 @@ public class DownloadService extends Service {
 	}
 
 	/**
-	 * 清空文件夹
+	 * 复制文件
+	 * 
+	 * @param s
+	 * @param t
 	 */
-	private void deleteAPKFile() {
-		File file = new File(saveFileName);
-		if (file.exists()) {
-			file.delete();
+	public void fileChannelCopy(String s, String t) {
+		FileInputStream fi = null;
+		FileOutputStream fo = null;
+		FileChannel in = null;
+		FileChannel out = null;
+		try {
+			fi = new FileInputStream(s);
+			fo = new FileOutputStream(t);
+			in = fi.getChannel();// 得到对应的文件通道
+			out = fo.getChannel();// 得到对应的文件通道
+			in.transferTo(0, in.size(), out);// 连接两个通道，并且从in通道读取，然后写入out通道
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				fi.close();
+				in.close();
+				fo.close();
+				out.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 
 	private void startDownload() {
-		deleteAPKFile();
 		canceled = false;
 		downloadApk();
 	}
@@ -298,7 +320,8 @@ public class DownloadService extends Service {
 			if (!file.exists()) {
 				file.mkdirs();
 			}
-			String apkFile = saveFileName;
+			// String apkFile = saveFileName;
+			String apkFile = tempSaveFileName;
 			File ApkFile = new File(apkFile);
 			FileOutputStream fos = new FileOutputStream(ApkFile);
 
