@@ -6,6 +6,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.alibaba.fastjson.JSON;
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -40,6 +41,9 @@ import android.view.View;
 import android.widget.Toast;
 
 public class UpdateActivity extends Activity {
+
+	private static final int MY_SOCKET_TIMEOUT_MS = 5000; // volley 5s超时
+	private static final int MY_MAX_RETRIES = 3; // volley retry 3次
 
 	private MyApp app;
 	private boolean isDestroy = true;
@@ -150,6 +154,8 @@ public class UpdateActivity extends Activity {
 				});
 
 		mJsonObjectRequest.setShouldCache(false);
+		mJsonObjectRequest.setRetryPolicy(new DefaultRetryPolicy(
+				MY_SOCKET_TIMEOUT_MS, MY_MAX_RETRIES, 0));
 		mRequestQueue.add(mJsonObjectRequest);
 	}
 
