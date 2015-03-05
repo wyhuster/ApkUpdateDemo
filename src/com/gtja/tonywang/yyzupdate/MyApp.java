@@ -36,16 +36,16 @@ public class MyApp extends Application {
 
 	private String getSavePath(String directory) {
 
-		String state = Environment.getExternalStorageState();
-		System.out.println("state:" + state);
-		if (state.equals(Environment.MEDIA_MOUNTED)) {
-			String path = Environment.getExternalStorageDirectory()
-					.getAbsolutePath();
-			return path + directory;
-		} else {
-			String path = Environment.getDataDirectory().getAbsolutePath();
-			return path + directory;
-		}
+		// String state = Environment.getExternalStorageState();
+		// System.out.println("state:" + state);
+		// if (state.equals(Environment.MEDIA_MOUNTED)) {
+		String path = Environment.getExternalStorageDirectory()
+				.getAbsolutePath();
+		return path + directory;
+		// } else {
+		// String path = Environment.getDataDirectory().getAbsolutePath();
+		// return path + directory;
+		// }
 
 	}
 

@@ -65,9 +65,12 @@ public class UpdateActivity extends Activity {
 		update_type = getIntent().getIntExtra("update_type", -1);
 		sp = PreferenceManager.getDefaultSharedPreferences(this);
 
+		isDestroy = false;
 		if (!app.isDownload()) {
 			checkUpdate(check_url);
 		}
+
+		System.out.println(" updateactivity  onCreate");
 	}
 
 	/**
@@ -98,12 +101,12 @@ public class UpdateActivity extends Activity {
 				new Response.Listener<JSONObject>() {
 					@Override
 					public void onResponse(JSONObject response) {
-						update_loading.setVisibility(View.GONE);
 						System.out.println("app update请求结果:"
 								+ response.toString());
 						if (isDestroy) {
 							return;
 						}
+						update_loading.setVisibility(View.GONE);
 						try {
 							String android_update = response
 									.getString("android");
@@ -136,10 +139,13 @@ public class UpdateActivity extends Activity {
 				}, new Response.ErrorListener() {
 					@Override
 					public void onErrorResponse(VolleyError error) {
-						update_loading.setVisibility(View.GONE);
+
 						System.out.println("app update请求错误:" + error.toString());
 						Toast.makeText(getApplicationContext(),
 								error.toString(), Toast.LENGTH_SHORT).show();
+						if (!isDestroy) {
+							update_loading.setVisibility(View.GONE);
+						}
 					}
 				});
 
@@ -207,7 +213,7 @@ public class UpdateActivity extends Activity {
 		final String versionname = model.getVersion();
 		// notify user to download
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
-		builder.setTitle("检测到新版本,是否下载？")
+		builder.setTitle("检测到新版本，是否下载？")
 				.setMessage(model.getNoticeText())
 				.setCancelable(true)
 				.setPositiveButton("是", new DialogInterface.OnClickListener() {
@@ -241,7 +247,7 @@ public class UpdateActivity extends Activity {
 		final String versionname = model.getVersion();
 		// notify user to download
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
-		builder.setTitle("检测到新版本,请更新").setMessage(model.getNoticeText())
+		builder.setTitle("检测到新版本，请更新").setMessage(model.getNoticeText())
 				.setCancelable(true)
 				.setPositiveButton("更新", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
@@ -305,6 +311,8 @@ public class UpdateActivity extends Activity {
 			it.putExtra("update_type", UpdateType.UPDATE_SILENCE);
 			startService(it);
 			bindService(it, conn, Context.BIND_AUTO_CREATE);
+			Toast.makeText(getApplicationContext(), "后台在偷偷地下载～～",
+					Toast.LENGTH_SHORT).show();
 		}
 	}
 
@@ -331,8 +339,7 @@ public class UpdateActivity extends Activity {
 	@Override
 	protected void onResume() {
 		super.onResume();
-		isDestroy = false;
-		System.out.println(" notification  onResume");
+		System.out.println(" updateactivity  onResume");
 	}
 
 	@Override
@@ -341,7 +348,7 @@ public class UpdateActivity extends Activity {
 		if (!app.isDownload()) {
 			checkUpdate(check_url);
 		}
-		System.out.println(" notification  onNewIntent");
+		System.out.println(" updateactivity  onNewIntent");
 	}
 
 	@Override
@@ -353,22 +360,22 @@ public class UpdateActivity extends Activity {
 	@Override
 	protected void onPause() {
 		super.onPause();
-		System.out.println(" notification  onPause");
+		System.out.println(" updateactivity  onPause");
 	}
 
 	@Override
 	protected void onStop() {
 		super.onStop();
-		isDestroy = true;
-		// 取消下载
-		cancelDownload();
-		System.out.println(" notification  onStop");
+		System.out.println(" updateactivity  onStop");
 	}
 
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		System.out.println(" notification  onDestroy");
+		isDestroy = true;
+		// 取消下载
+		cancelDownload();
+		System.out.println(" updateactivity  onDestroy");
 	}
 
 	/**

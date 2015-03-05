@@ -75,9 +75,9 @@ public class DownloadService extends Service {
 				fileChannelCopy(tempSaveFileName, saveFileName);
 				serviceIsDestroy = true;
 				stopSelf();
-				if (update_type != UpdateType.UPDATE_SILENCE) {
-					installApk();
-				}
+				// if (update_type != UpdateType.UPDATE_SILENCE) {
+				installApk();
+				// }
 				break;
 			case DOWNLOAD_FAIL:
 				// 下载失败
