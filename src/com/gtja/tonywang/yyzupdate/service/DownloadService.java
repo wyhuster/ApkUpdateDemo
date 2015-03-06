@@ -46,9 +46,9 @@ public class DownloadService extends Service {
 	private int update_type = -1;
 	private String versionname;
 
-	private String savePath = Constants.APK_SAVE_PATH;
-	private String saveFileName = Constants.APK_SAVE_FILE_NAME;
-	private String tempSaveFileName = savePath + "temp";
+	private String savePath;
+	private String saveFileName;
+	private String tempSaveFileName;
 	private ICallbackResult callback;
 	private DownloadBinder binder;
 	private MyApp app;
@@ -70,14 +70,20 @@ public class DownloadService extends Service {
 					mNotificationManager.cancel(NOTIFY_ID);
 				}
 				Editor editor = sp.edit();
-				editor.putString(Constants.LOCAL_APK_VERSION, versionname);
+				editor.putString(Constants.PREF_LOCAL_APK_VERSION, versionname);
 				editor.commit();
-				fileChannelCopy(tempSaveFileName, saveFileName);
 				serviceIsDestroy = true;
 				stopSelf();
+
+				// 从temp文件拷贝内容到apk文件中
+				fileChannelCopy(tempSaveFileName, saveFileName);
 				// if (update_type != UpdateType.UPDATE_SILENCE) {
-				installApk();
+				app.installApk();
 				// }
+				if (callback != null) {
+					// 关闭强制下载时候的对话框
+					callback.OnBackResult("finish");
+				}
 				break;
 			case DOWNLOAD_FAIL:
 				// 下载失败
@@ -134,8 +140,8 @@ public class DownloadService extends Service {
 		mNotificationManager = (NotificationManager) getSystemService(android.content.Context.NOTIFICATION_SERVICE);
 		// setForeground(true);
 		app = (MyApp) getApplication();
-		savePath = app.getApk_save_path();
-		saveFileName = app.getApk_save_name();
+		savePath = app.getApkSavePath();
+		saveFileName = app.getApkSaveName();
 		tempSaveFileName = savePath + "temp";
 
 		sp = PreferenceManager.getDefaultSharedPreferences(this);
@@ -179,6 +185,53 @@ public class DownloadService extends Service {
 		System.out.println("downloadservice onRebind");
 	}
 
+	/**
+	 * 复制文件
+	 * 
+	 * @param s
+	 * @param t
+	 */
+	public void fileChannelCopy(String s, String t) {
+		FileInputStream fi = null;
+		FileOutputStream fo = null;
+		FileChannel in = null;
+		FileChannel out = null;
+		try {
+			if (app.getStoreInSdcard()) {
+				fi = new FileInputStream(s);
+				fo = new FileOutputStream(t);
+			} else {
+				fi = openFileInput(s);
+				fo = openFileOutput(t, Context.MODE_PRIVATE);
+			}
+			in = fi.getChannel();// 得到对应的文件通道
+			out = fo.getChannel();// 得到对应的文件通道
+			in.transferTo(0, in.size(), out);// 连接两个通道，并且从in通道读取，然后写入out通道
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				fi.close();
+				in.close();
+				fo.close();
+				out.close();
+				// 删除临时文件
+				if (app.getStoreInSdcard()) {
+					new File(s).delete();
+				} else {
+					deleteFile(s);
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+	}
+
+	// 下载线程
+	private Thread downLoadThread;
+
+	// binder 将service和activity联系起来
 	public class DownloadBinder extends Binder {
 		public void start() {
 			if (downLoadThread == null || !downLoadThread.isAlive()) {
@@ -187,11 +240,14 @@ public class DownloadService extends Service {
 				if (update_type == UpdateType.UPDATE_NORMAL) {
 					setUpNotification();
 				}
-				new Thread() {
+				canceled = false;
+				downLoadThread = new Thread(new Runnable() {
+					@Override
 					public void run() {
-						startDownload();
-					};
-				}.start();
+						downloadApk();
+					}
+				});
+				downLoadThread.start();
 			}
 		}
 
@@ -221,41 +277,8 @@ public class DownloadService extends Service {
 	}
 
 	/**
-	 * 复制文件
-	 * 
-	 * @param s
-	 * @param t
+	 * 设置下载通知栏
 	 */
-	public void fileChannelCopy(String s, String t) {
-		FileInputStream fi = null;
-		FileOutputStream fo = null;
-		FileChannel in = null;
-		FileChannel out = null;
-		try {
-			fi = new FileInputStream(s);
-			fo = new FileOutputStream(t);
-			in = fi.getChannel();// 得到对应的文件通道
-			out = fo.getChannel();// 得到对应的文件通道
-			in.transferTo(0, in.size(), out);// 连接两个通道，并且从in通道读取，然后写入out通道
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				fi.close();
-				in.close();
-				fo.close();
-				out.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-
-	private void startDownload() {
-		canceled = false;
-		downloadApk();
-	}
-
 	private void setUpNotification() {
 		int icon = R.drawable.ic_launcher;
 		CharSequence tickerText = "开始下载";
@@ -271,41 +294,10 @@ public class DownloadService extends Service {
 		mNotificationManager.notify(NOTIFY_ID, mNotification);
 	}
 
-	private Thread downLoadThread;
-
-	private void downloadApk() {
-		downLoadThread = new Thread(mdownApkRunnable);
-		downLoadThread.start();
-	}
-
-	private void installApk() {
-		File apkfile = new File(saveFileName);
-		if (!apkfile.exists()) {
-			return;
-		}
-		Intent i = new Intent(Intent.ACTION_VIEW);
-		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		i.setDataAndType(Uri.parse("file://" + apkfile.toString()),
-				"application/vnd.android.package-archive");
-		mContext.startActivity(i);
-		if (callback != null) {
-			callback.OnBackResult("finish");
-		}
-
-	}
-
-	private int lastRate = 0;
-	private Runnable mdownApkRunnable = new Runnable() {
-		@Override
-		public void run() {
-			httpDownload();
-		}
-	};
-
 	/**
 	 * apk下载函数
 	 */
-	private void httpDownload() {
+	private void downloadApk() {
 		int length = 0;
 		int count = 0;
 		boolean fail = false;
@@ -319,19 +311,24 @@ public class DownloadService extends Service {
 			length = conn.getContentLength();
 			InputStream is = conn.getInputStream();
 
-			File file = new File(savePath);
-			if (!file.exists()) {
-				file.mkdirs();
+			FileOutputStream fos = null;
+
+			System.out.println("download path:" + tempSaveFileName);
+
+			if (!app.getStoreInSdcard()) {
+				// 没有内存卡，则存储到手机内部/data/data/{package}/files/
+				fos = openFileOutput(tempSaveFileName, Context.MODE_PRIVATE);
+			} else {
+				// 存储到内存卡
+				File file = new File(savePath);
+				if (!file.exists()) {
+					file.mkdirs();
+				}
+				fos = new FileOutputStream(tempSaveFileName);
 			}
-			// String apkFile = saveFileName;
-			String apkFile = tempSaveFileName;
-			System.out.println("download path:" + apkFile);
-			File ApkFile = new File(apkFile);
-			FileOutputStream fos = new FileOutputStream(ApkFile);
 
-			// int count = 0;
+			int lastRate = 0;
 			byte buf[] = new byte[1024];
-
 			do {
 				int numread = is.read(buf);
 				count += numread;
@@ -369,5 +366,4 @@ public class DownloadService extends Service {
 			mHandler.sendEmptyMessage(DOWNLOAD_FAIL);
 		}
 	}
-
 }

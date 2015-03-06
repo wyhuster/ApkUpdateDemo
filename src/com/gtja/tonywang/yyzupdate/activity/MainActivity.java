@@ -1,13 +1,18 @@
 package com.gtja.tonywang.yyzupdate.activity;
 
+import java.io.File;
+import java.io.IOException;
+
 import com.gtja.tonywang.yyzupdate.R;
 import com.gtja.tonywang.yyzupdate.UpdateType;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
@@ -44,4 +49,5 @@ public class MainActivity extends Activity {
 		i.putExtra("update_type", update_type);
 		startActivity(i);
 	}
+
 }

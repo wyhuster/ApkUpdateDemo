@@ -167,15 +167,13 @@ public class UpdateActivity extends Activity {
 	 */
 	private boolean checkNeedDownload(String newVersion) {
 		boolean needDownload = false;
-		// File local_file = new File(Constants.APK_SAVE_FILE_NAME);
-		File local_file = new File(app.getApk_save_name());
-		if (local_file.exists()) {
+		if (app.apkFileExists()) {
 			String local_apk_version = sp.getString(
-					Constants.LOCAL_APK_VERSION, "");
+					Constants.PREF_LOCAL_APK_VERSION, "");
 			if (newVersion.compareTo(local_apk_version) > 0) {
 				needDownload = true;
 			} else {
-				showInstallApkDialog(local_file);
+				showInstallApkDialog();
 				// needDownload = false;
 			}
 		} else {
@@ -184,21 +182,14 @@ public class UpdateActivity extends Activity {
 		return needDownload;
 	}
 
-	private void showInstallApkDialog(final File local_file) {
+	private void showInstallApkDialog() {
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
-		builder.setTitle("应用更新")
-				.setMessage("已准备好新版本，是否安装？")
+		builder.setTitle("应用更新").setMessage("已准备好新版本，是否安装？")
 				.setCancelable(true)
 				.setPositiveButton("是", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
 						// 安装本地apk
-						Intent i = new Intent(Intent.ACTION_VIEW);
-						i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-						i.setDataAndType(
-								Uri.parse("file://" + local_file.toString()),
-								"application/vnd.android.package-archive");
-						startActivity(i);
-
+						app.installApk();
 					}
 				})
 				.setNegativeButton("否", new DialogInterface.OnClickListener() {
@@ -217,10 +208,14 @@ public class UpdateActivity extends Activity {
 	private void updateNormal(UpdateModel model) {
 		final String url = model.getLoadAddress();
 		final String versionname = model.getVersion();
+		String notice = "";
+		if (app.getNetworkInfo() == Constants.NETWORK_MOBILE) {
+			notice = "\n\n当前连接非wifi网络，下载需要消耗大量流量！！！";
+		}
 		// notify user to download
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
 		builder.setTitle("检测到新版本，是否下载？")
-				.setMessage(model.getNoticeText())
+				.setMessage(model.getNoticeText() + notice)
 				.setCancelable(true)
 				.setPositiveButton("是", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
@@ -251,10 +246,14 @@ public class UpdateActivity extends Activity {
 	private void updateForce(UpdateModel model) {
 		final String url = model.getLoadAddress();
 		final String versionname = model.getVersion();
+		String notice = "";
+		if (app.getNetworkInfo() == Constants.NETWORK_MOBILE) {
+			notice = "\n\n当前网络连接非wifi，下载需要消耗大量流量！！！";
+		}
 		// notify user to download
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
-		builder.setTitle("检测到新版本，请更新").setMessage(model.getNoticeText())
-				.setCancelable(true)
+		builder.setTitle("检测到新版本，请更新")
+				.setMessage(model.getNoticeText() + notice).setCancelable(true)
 				.setPositiveButton("更新", new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
 						if (!app.isDownload()) {
@@ -289,7 +288,7 @@ public class UpdateActivity extends Activity {
 		});
 		dialog.setCanceledOnTouchOutside(false);
 		dialog.setIcon(R.drawable.ic_launcher);// 设置提示的title的图标，默认是没有的
-		dialog.setTitle("更新");
+		dialog.setTitle("正在更新");
 		dialog.setMax(100);
 		dialog.show();
 		if (!app.isDownload()) {
