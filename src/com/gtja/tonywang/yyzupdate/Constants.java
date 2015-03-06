@@ -2,7 +2,7 @@ package com.gtja.tonywang.yyzupdate;
 
 public class Constants {
 	/** 查询update信息的api */
-	public static final String URL_CHECK_UPDATE = "http://dd.gtja.com/download/yyz/YyzplusVer.json";
+	public static final String URL_CHECK_UPDATE = "";
 
 	/** 下载到sdcard中新建的文件夹 */
 	public static final String APK_SAVE_PATH = "/yyzApkDownload/";
