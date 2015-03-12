@@ -112,6 +112,11 @@ public class MyApp extends Application {
 		}
 	}
 
+	/**
+	 * 返回当前网络连接情况 未连接，wifi，mobile
+	 * 
+	 * @return
+	 */
 	public int getNetworkInfo() {
 		ConnectivityManager connectMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 		NetworkInfo info = connectMgr.getActiveNetworkInfo();
